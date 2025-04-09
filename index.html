@@ -92,6 +92,21 @@
             padding: 2rem;
         }
         
+        .setup-section.collapsed {
+            padding: 1rem 2rem;
+        }
+        
+        .setup-section.collapsed .player-inputs,
+        .setup-section.collapsed .game-settings,
+        .setup-section.collapsed #startGame {
+            display: none;
+        }
+        
+        .setup-section.collapsed h2 {
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+        
         h2 {
             font-family: 'Montserrat', sans-serif;
             color: var(--primary);
@@ -268,7 +283,7 @@
             flex-wrap: wrap;
             gap: 1rem;
             margin-top: 2rem;
-            justify-content: space-between;
+            justify-content: flex-end;
         }
         
         .round-indicator {
@@ -475,17 +490,17 @@
             </div>
             
             <div class="actions">
-                <button id="newGame" class="btn-secondary">
-                    <i class="fas fa-redo"></i> New Game
-                </button>
                 <button id="calculateTotals" class="btn-highlight">
                     <i class="fas fa-calculator"></i> Calculate Scores
+                </button>
+                <button id="nextRound" style="display: none;">
+                    <i class="fas fa-arrow-right"></i> Next Round
                 </button>
                 <button id="exportPDF" class="btn-accent">
                     <i class="fas fa-file-pdf"></i> Export to PDF
                 </button>
-                <button id="nextRound" style="display: none;">
-                    <i class="fas fa-arrow-right"></i> Next Round
+                <button id="newGame" class="btn-secondary">
+                    <i class="fas fa-redo"></i> New Game
                 </button>
             </div>
         </div>
@@ -503,6 +518,7 @@
             const gameSection = document.getElementById('gameSection');
             const scorecard = document.getElementById('scorecard');
             const currentRoundDisplay = document.getElementById('currentRoundDisplay');
+            const setupSection = document.querySelector('.setup-section');
             
             let players = [];
             let rounds = 10;
@@ -542,6 +558,12 @@
                 // Generate scorecard
                 generateScorecard();
                 
+                // Collapse setup section
+                setupSection.classList.add('collapsed');
+                setupSection.querySelector('h2').addEventListener('click', function() {
+                    setupSection.classList.remove('collapsed');
+                });
+                
                 // Show game section
                 gameSection.style.display = 'block';
                 
@@ -553,6 +575,7 @@
             newGameBtn.addEventListener('click', function() {
                 if (confirm('Are you sure you want to start a new game? All current scores will be lost.')) {
                     gameSection.style.display = 'none';
+                    setupSection.classList.remove('collapsed');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                     
                     // Reset form
@@ -565,93 +588,97 @@
             
             // Export to PDF
             exportPDFBtn.addEventListener('click', function() {
-                // Check if jsPDF is loaded
-                if (typeof jsPDF === 'undefined' || typeof window.jspdf === 'undefined') {
-                    alert('PDF library is still loading. Please try again in a moment.');
-                    return;
-                }
-                
-                const { jsPDF } = window.jspdf;
-                generatePDF();
-            });
-
-            function generatePDF() {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF({
-                    orientation: 'landscape'
-                });
-                
-                // Add logo and header
-                doc.setFontSize(24);
-                doc.setTextColor(139, 0, 0);
-                doc.setFont('helvetica', 'bold');
-                doc.text('PLAYING CARD SB BY CHOTO', 105, 20, { align: 'center' });
-                
-                // Add game information
-                doc.setFontSize(12);
-                doc.setTextColor(30, 30, 30);
-                doc.setFont('helvetica', 'normal');
-                doc.text(`Game Date: ${new Date().toLocaleDateString()}`, 20, 35);
-                doc.text(`Players: ${players.join(', ')}`, 20, 45);
-                doc.text(`Total Rounds: ${rounds}`, 20, 55);
-                doc.text(`Current Round: ${currentRound}`, 20, 65);
-                
-                // Prepare data for the table
-                const headers = ['Player', ...Array.from({length: rounds}, (_, i) => `Round ${i+1}`), 'Total'];
-                
-                const data = players.map(player => {
-                    const row = [player];
-                    for (let i = 0; i < rounds; i++) {
-                        row.push(scores[player].rounds[i]);
+                try {
+                    // Check if jsPDF is loaded
+                    if (typeof jsPDF === 'undefined') {
+                        throw new Error('PDF library not loaded');
                     }
-                    row.push(scores[player].total);
-                    return row;
-                });
-                
-                // Add the table
-                doc.autoTable({
-                    startY: 75,
-                    head: [headers],
-                    body: data,
-                    theme: 'grid',
-                    headStyles: {
-                        fillColor: [139, 0, 0],
-                        textColor: 255,
-                        fontStyle: 'bold'
-                    },
-                    alternateRowStyles: {
-                        fillColor: [248, 241, 229]
-                    },
-                    columnStyles: {
-                        0: { 
-                            cellWidth: 'auto',
-                            fillColor: [30, 30, 30],
+                    
+                    const { jsPDF } = window.jspdf;
+                    
+                    // Create new PDF document
+                    const doc = new jsPDF({
+                        orientation: 'landscape'
+                    });
+                    
+                    // Add title
+                    doc.setFontSize(24);
+                    doc.setTextColor(139, 0, 0);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('PLAYING CARD SB BY CHOTO', 105, 20, { align: 'center' });
+                    
+                    // Add game info
+                    doc.setFontSize(12);
+                    doc.setTextColor(30, 30, 30);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`Game Date: ${new Date().toLocaleDateString()}`, 20, 35);
+                    doc.text(`Players: ${players.join(', ')}`, 20, 45);
+                    doc.text(`Total Rounds: ${rounds}`, 20, 55);
+                    doc.text(`Current Round: ${currentRound}`, 20, 65);
+                    
+                    // Prepare table data
+                    const headers = ['Player'];
+                    for (let i = 1; i <= rounds; i++) {
+                        headers.push(`Round ${i}`);
+                    }
+                    headers.push('Total');
+                    
+                    const data = players.map(player => {
+                        const row = [player];
+                        for (let i = 0; i < rounds; i++) {
+                            row.push(scores[player].rounds[i]);
+                        }
+                        row.push(scores[player].total);
+                        return row;
+                    });
+                    
+                    // Add table to PDF
+                    doc.autoTable({
+                        startY: 75,
+                        head: [headers],
+                        body: data,
+                        theme: 'grid',
+                        headStyles: {
+                            fillColor: [139, 0, 0],
                             textColor: 255,
                             fontStyle: 'bold'
                         },
-                        [headers.length - 1]: {
-                            fillColor: [30, 30, 30],
-                            textColor: 255,
-                            fontStyle: 'bold'
+                        alternateRowStyles: {
+                            fillColor: [248, 241, 229]
+                        },
+                        columnStyles: {
+                            0: {
+                                fillColor: [30, 30, 30],
+                                textColor: 255,
+                                fontStyle: 'bold'
+                            },
+                            [headers.length - 1]: {
+                                fillColor: [30, 30, 30],
+                                textColor: 255,
+                                fontStyle: 'bold'
+                            }
+                        },
+                        margin: { top: 75 },
+                        styles: {
+                            fontSize: 10,
+                            halign: 'center'
                         }
-                    },
-                    margin: { top: 75 },
-                    styles: {
-                        fontSize: 10,
-                        halign: 'center',
-                        valign: 'middle'
-                    }
-                });
-                
-                // Add footer
-                doc.setFontSize(10);
-                doc.setTextColor(100, 100, 100);
-                doc.text('Generated by PLAYING CARD SB BY CHOTO Score Tracker', 
-                        105, doc.internal.pageSize.height - 10, { align: 'center' });
-                
-                // Save the PDF
-                doc.save(`CardGame_Scores_${new Date().toLocaleDateString().replace(/\//g, '-')}.pdf`);
-            }
+                    });
+                    
+                    // Add footer
+                    doc.setFontSize(10);
+                    doc.setTextColor(100, 100, 100);
+                    doc.text('Generated by PLAYING CARD SB BY CHOTO Score Tracker', 
+                            105, doc.internal.pageSize.height - 10, { align: 'center' });
+                    
+                    // Save the PDF
+                    doc.save(`CardGame_Scores_${new Date().toISOString().slice(0,10)}.pdf`);
+                    
+                } catch (error) {
+                    console.error('PDF generation error:', error);
+                    alert('Error generating PDF. Please try again or check console for details.');
+                }
+            });
             
             // Generate the scorecard HTML
             function generateScorecard() {
@@ -669,7 +696,7 @@
                 }
                 
                 html += `
-                            <th>Total</th>
+                                <th>Total</th>
                             </tr>
                         </thead>
                         <tbody>
